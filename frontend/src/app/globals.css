@@ -13,6 +13,12 @@
   
   --accent-primary: #818cf8; /* Soft Indigo */
   --accent-secondary: #34d399; /* Soft Emerald */
+
+  /* Space Theme Colors - Darker/Black series */
+  --space-deep: #020205;
+  --space-glow: #080810;
+  --nebula-purple: rgba(88, 28, 135, 0.1);
+  --nebula-blue: rgba(23, 37, 84, 0.1);
   
   /* Border & Radii */
   --border-color: #27272a;
@@ -120,4 +126,62 @@ body {
 }
 .leaflet-container a.leaflet-popup-close-button {
   color: var(--text-muted) !important;
+}
+
+/* Space Animations */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0) scale(1.0); }
+  50% { transform: translate(2%, 2%) scale(1.1); }
+  100% { transform: translate(0, 0) scale(1.0); }
+}
+
+@keyframes star-flow {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100vh); }
+}
+
+@keyframes shooting-star {
+  0% { transform: translateX(0) translateY(0) rotate(-45deg) scale(0); opacity: 0; }
+  10% { transform: translateX(-100px) translateY(100px) rotate(-45deg) scale(1); opacity: 1; }
+  90% { transform: translateX(-900px) translateY(900px) rotate(-45deg) scale(1); opacity: 1; }
+  100% { transform: translateX(-1000px) translateY(1000px) rotate(-45deg) scale(0); opacity: 0; }
+}
+
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: twinkle var(--duration, 3s) infinite ease-in-out;
+  opacity: var(--opacity, 0.5);
+}
+
+.shooting-star {
+  position: absolute;
+  width: 150px;
+  height: 2px;
+  background: linear-gradient(90deg, white, transparent);
+  border-radius: 50% 0 0 50%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px white);
+  animation: shooting-star var(--duration) var(--delay) infinite linear;
+  opacity: 0;
+  z-index: -1;
+}
+
+.nebula {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(80px);
+  animation: drift 20s infinite ease-in-out;
 }

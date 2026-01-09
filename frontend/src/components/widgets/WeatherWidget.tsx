@@ -64,8 +64,8 @@ const WeatherWidget: React.FC = () => {
     const getWeatherTheme = (code: number) => {
         // 맑음
         if (code === 0) return {
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            iconColor: '#FFD700',
+            background: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+            iconColor: '#FFFFFF',
             textColor: '#FFFFFF'
         };
         // 구름 조금
@@ -172,7 +172,7 @@ const WeatherWidget: React.FC = () => {
                 temperature: Math.round(data.current.temperature_2m),
                 humidity: data.current.relative_humidity_2m,
                 weatherCode: data.current.weather_code,
-                cityName: city,
+                cityName: city || '알 수 없음',
             });
             setCurrentLocation({ lat, lon });
         } catch (error) {
