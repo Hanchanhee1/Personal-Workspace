@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
-// 2026 Korean Holidays (Standardize key format for matching)
+// 2026년 한국 공휴일 (매칭을 위해 키 형식을 표준화)
 const HOLIDAYS_2026: Record<string, string> = {
     '2026-01-01': '신정',
     '2026-02-16': '설날 연휴',
@@ -41,6 +41,28 @@ const HOLIDAYS_2026: Record<string, string> = {
     '2026-10-05': '대체공휴일',
     '2026-10-09': '한글날',
     '2026-12-25': '성탄절',
+};
+
+// 2026년 일본 공휴일
+const JP_HOLIDAYS_2026: Record<string, string> = {
+    '2026-01-01': '元日',
+    '2026-01-12': '成人の日',
+    '2026-02-11': '建国記念の日',
+    '2026-02-23': '天皇誕生日',
+    '2026-03-20': '春分の日',
+    '2026-04-29': '昭和の日',
+    '2026-05-03': '憲法記念日',
+    '2026-05-04': 'みどりの日',
+    '2026-05-05': 'こどもの日',
+    '2026-05-06': '振替休日',
+    '2026-07-20': '海の日',
+    '2026-08-11': '山の日',
+    '2026-09-21': '敬老の日',
+    '2026-09-22': '国民の休日',
+    '2026-09-23': '秋分の日',
+    '2026-10-12': 'スポーツの日',
+    '2026-11-03': '文化の日',
+    '2026-11-23': '勤労感謝の日',
 };
 
 interface CalendarEvent {
@@ -157,7 +179,7 @@ const CalendarWidget: React.FC = () => {
 
     const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-    // --- Styling Objects (Robust CSS-in-JS) ---
+    // --- 스타일링 객체 (CSS-in-JS) ---
     const styles = {
         container: {
             backgroundColor: 'var(--bg-card)',
@@ -220,13 +242,27 @@ const CalendarWidget: React.FC = () => {
                         </div>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', backgroundColor: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <button onClick={prevMonth} style={{ padding: '6px', cursor: 'pointer', background: 'none', border: 'none', color: '#a1a1aa' }}>
-                        <ChevronLeft size={18} />
-                    </button>
-                    <button onClick={nextMonth} style={{ padding: '6px', cursor: 'pointer', background: 'none', border: 'none', color: '#a1a1aa' }}>
-                        <ChevronRight size={18} />
-                    </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {/* 공휴일 범례 */}
+                    <div style={{ display: 'flex', gap: '12px', fontSize: '0.65rem', fontWeight: 600, marginRight: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                            <span style={{ color: '#ef4444' }}>한국 공휴일</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f472b6' }} />
+                            <span style={{ color: '#f472b6' }}>일본 공휴일</span>
+                        </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px', backgroundColor: 'rgba(0,0,0,0.3)', padding: '4px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button onClick={prevMonth} style={{ padding: '6px', cursor: 'pointer', background: 'none', border: 'none', color: '#a1a1aa' }}>
+                            <ChevronLeft size={18} />
+                        </button>
+                        <button onClick={nextMonth} style={{ padding: '6px', cursor: 'pointer', background: 'none', border: 'none', color: '#a1a1aa' }}>
+                            <ChevronRight size={18} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -244,6 +280,7 @@ const CalendarWidget: React.FC = () => {
                 {calendarDays.map((day) => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const holiday = HOLIDAYS_2026[dateStr];
+                    const jpHoliday = JP_HOLIDAYS_2026[dateStr];
                     const dayEvents = events.filter(e => e.event_date === dateStr);
                     const isOtherMonth = !isSameMonth(day, monthStart);
                     const isTodayNow = isToday(day);
@@ -268,19 +305,26 @@ const CalendarWidget: React.FC = () => {
                                     borderRadius: '50%',
                                     fontSize: '0.8rem',
                                     backgroundColor: isTodayNow ? '#818cf8' : 'transparent',
-                                    color: isTodayNow ? '#fff' : (holiday || Sunday ? '#ef4444' : Saturday ? '#3b82f6' : isOtherMonth ? '#3f3f46' : '#f4f4f5'),
+                                    color: isTodayNow ? '#fff' : (holiday || Sunday ? '#ef4444' : jpHoliday ? '#f472b6' : Saturday ? '#3b82f6' : isOtherMonth ? '#3f3f46' : '#f4f4f5'),
                                     fontWeight: isTodayNow ? 700 : 500
                                 }}>
                                     {format(day, 'd')}
                                 </span>
-                                {holiday && (
-                                    <span style={{ fontSize: '0.6rem', color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
-                                        {holiday}
-                                    </span>
-                                )}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                    {holiday && (
+                                        <span style={{ fontSize: '0.6rem', color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
+                                            {holiday}
+                                        </span>
+                                    )}
+                                    {jpHoliday && (
+                                        <span style={{ fontSize: '0.55rem', color: '#f472b6', backgroundColor: 'rgba(244, 114, 182, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
+                                            {jpHoliday}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                             
-                            {/* Events Bar */}
+                            {/* 일정 바 */}
                             <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 {dayEvents.slice(0, 2).map(e => (
                                     <div key={e.id} style={{ height: '3px', borderRadius: '2px', backgroundColor: e.color || '#818cf8', opacity: 0.7 }} />
