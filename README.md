@@ -28,9 +28,13 @@
     - `frontend-legacy/supabase_schema.sql` (기본 유저 및 Todo, Diary, Places 테이블)
     - `frontend/supabase_weather_schema.sql` (날씨 즐겨찾기 테이블)
     - `frontend/calendar_schema.sql` (캘린더 이벤트 테이블)
+    - `frontend/notification_schema.sql` (알림 로그 테이블 및 뷰)
 3.  **인증 설정 (Authentication)**:
     - `Authentication` > `Providers`에서 `Google` 또는 `Email` (Magic Link)을 활성화합니다.
     - Google 로그인의 경우 Google Cloud Console에서 클라이언트 ID를 생성하여 등록해야 합니다.
+4.  **캘린더 알림 기능 설정 (선택사항)**:
+    - 자세한 설정 방법은 `frontend/NOTIFICATION_SETUP.md` 파일을 참고하세요.
+    - 이메일 알림을 받으려면 Resend 계정 생성 및 Edge Function 배포가 필요합니다.
 
 #### 2. 환경 변수 설정
 
@@ -68,3 +72,22 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ### 백엔드 (Backend)
 
 _아직 구현되지 않았습니다. 추후 업데이트 예정._
+
+## 📧 주요 기능
+
+### 캘린더 알림 기능
+
+캘린더 일정에 대한 자동 이메일 알림 기능이 포함되어 있습니다.
+
+- **알림 시점**: 일정 7일 전, 3일 전, 1일 전, 당일
+- **자동 발송**: GitHub Actions를 통한 매일 자동 실행
+- **이메일 서비스**: Resend 사용 (무료 플랜 지원)
+
+**설정 방법:**
+1. `frontend/NOTIFICATION_SETUP.md` 파일 참고
+2. Supabase Database Functions 실행
+3. Edge Function 배포
+4. Resend API 키 설정
+5. GitHub Actions 워크플로우 설정
+
+자세한 내용은 `frontend/NOTIFICATION_SETUP.md`를 확인하세요.

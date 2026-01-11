@@ -1,4 +1,4 @@
--- Notification Logs Table
+-- 알림 로그 테이블
 CREATE TABLE IF NOT EXISTS notification_logs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     event_id UUID REFERENCES calendar_events(id) ON DELETE CASCADE,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS notification_logs (
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- RLS
+-- RLS 활성화
 ALTER TABLE notification_logs ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own notification logs"

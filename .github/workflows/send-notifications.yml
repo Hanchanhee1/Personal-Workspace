@@ -1,0 +1,17 @@
+name: Send Calendar Notifications
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # 매일 UTC 9시 (한국시간 오후 6시)
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  send-notifications:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Supabase Edge Function
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            https://crzbrnpgbdiwgsvytefn.supabase.co/functions/v1/send-notifications
