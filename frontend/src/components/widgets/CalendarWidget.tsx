@@ -179,6 +179,11 @@ const CalendarWidget: React.FC = () => {
 
     const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+    // 선택된 날짜의 공휴일 정보 계산
+    const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+    const selectedHoliday = selectedDateStr ? HOLIDAYS_2026[selectedDateStr] : undefined;
+    const selectedJpHoliday = selectedDateStr ? JP_HOLIDAYS_2026[selectedDateStr] : undefined;
+
     // --- 스타일링 객체 (CSS-in-JS) ---
     const styles = {
         container: {
@@ -324,12 +329,32 @@ const CalendarWidget: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* 일정 바 */}
+                            {/* 일정 목록 */}
                             <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                 {dayEvents.slice(0, 2).map(e => (
-                                    <div key={e.id} style={{ height: '3px', borderRadius: '2px', backgroundColor: e.color || '#818cf8', opacity: 0.7 }} />
+                                    <div 
+                                        key={e.id} 
+                                        style={{ 
+                                            fontSize: '0.6rem', 
+                                            color: '#e4e4e7', 
+                                            backgroundColor: 'rgba(129, 140, 248, 0.15)', 
+                                            padding: '2px 4px', 
+                                            borderRadius: '4px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                            borderLeft: `2px solid ${e.color || '#818cf8'}`
+                                        }}
+                                        title={e.title}
+                                    >
+                                        {e.title}
+                                    </div>
                                 ))}
-                                {dayEvents.length > 2 && <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', paddingLeft: '2px' }}>+ {dayEvents.length - 2}</div>}
+                                {dayEvents.length > 2 && (
+                                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', paddingLeft: '2px' }}>
+                                        + {dayEvents.length - 2}개 더
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
@@ -359,8 +384,12 @@ const CalendarWidget: React.FC = () => {
                         >
                             <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
-                                    <div style={{ color: '#fff', fontWeight: 600 }}>{format(selectedDate, 'M월 d일', { locale: ko })}</div>
-                                    <div style={{ fontSize: '0.7rem', color: '#71717a' }}>일정 관리</div>
+                                    <div style={{ color: '#fff', fontWeight: 600 }}>{format(selectedDate, 'M월 d일 EEEE', { locale: ko })}</div>
+                                    <div style={{ fontSize: '0.7rem', color: '#71717a', marginTop: '4px' }}>
+                                        {selectedHoliday && <span style={{ color: '#ef4444' }}>🇰🇷 {selectedHoliday}</span>}
+                                        {selectedJpHoliday && <span style={{ color: '#f472b6', marginLeft: selectedHoliday ? '8px' : '0' }}>🇯🇵 {selectedJpHoliday}</span>}
+                                        {!selectedHoliday && !selectedJpHoliday && '일정 관리'}
+                                    </div>
                                 </div>
                                 <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={20} /></button>
                             </div>

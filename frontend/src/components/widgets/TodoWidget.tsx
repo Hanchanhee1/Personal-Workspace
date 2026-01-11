@@ -314,7 +314,7 @@ const TodoWidget: React.FC = () => {
                     whileTap={{ scale: 0.9 }}
                     style={{ 
                         right: '8px', 
-                        top: '50%', 
+                        top: 'calc(50% - 1rem)', 
                         transform: 'translateY(-50%)',
                         background: newTodo.trim() ? 'var(--primary-color, #4A90E2)' : 'transparent',
                         border: 'none',
