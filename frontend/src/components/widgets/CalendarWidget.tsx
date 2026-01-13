@@ -14,7 +14,7 @@ import {
     isSameMonth,
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, X, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Edit2, Check, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -164,6 +164,38 @@ const CalendarWidget: React.FC = () => {
             console.error('Error deleting event:', error);
         } else {
             setEvents(events.filter(event => event.id !== id));
+        }
+    };
+
+    // Edit event state
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
+    const [editingTitle, setEditingTitle] = useState('');
+
+    const startEdit = (e: CalendarEvent) => {
+        setEditingEventId(e.id);
+        setEditingTitle(e.title);
+    };
+
+    const cancelEdit = () => {
+        setEditingEventId(null);
+        setEditingTitle('');
+    };
+
+    const saveEdit = async (id: string) => {
+        if (!editingTitle.trim()) return;
+        const { data, error } = await supabase
+            .from('calendar_events')
+            .update({ title: editingTitle.trim() })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error updating event:', error);
+            alert('일정 수정에 실패했습니다. 콘솔을 확인하세요.');
+        } else {
+            setEvents(events.map(ev => ev.id === id ? data : ev));
+            cancelEdit();
         }
     };
 
@@ -391,7 +423,7 @@ const CalendarWidget: React.FC = () => {
                                         {!selectedHoliday && !selectedJpHoliday && '일정 관리'}
                                     </div>
                                 </div>
-                                <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={20} /></button>
+                                <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', color: '#71717a', cursor: 'pointer' }}><X size={20} style={{ transform: 'translateY(2px)' }} /></button>
                             </div>
 
                             <div style={{ padding: '20px', maxHeight: '200px', overflowY: 'auto' }}>
@@ -400,8 +432,26 @@ const CalendarWidget: React.FC = () => {
                                 ) : (
                                     events.filter(e => e.event_date === format(selectedDate, 'yyyy-MM-dd')).map(e => (
                                         <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '10px', marginBottom: '8px' }}>
-                                            <span style={{ color: '#e4e4e7', fontSize: '0.85rem' }}>{e.title}</span>
-                                            <button onClick={(ev) => deleteEvent(e.id, ev)} style={{ background: 'none', border: 'none', color: '#ef4444', opacity: 0.6, cursor: 'pointer' }}><X size={14} /></button>
+                                            {editingEventId === e.id ? (
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={editingTitle}
+                                                        onChange={ev => setEditingTitle(ev.target.value)}
+                                                        style={{ flex: 1, backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '6px 8px', color: '#fff' }}
+                                                    />
+                                                    <button onClick={() => saveEdit(e.id)} aria-label="저장" title="저장" style={{ background: '#10b981', border: 'none', borderRadius: '8px', padding: '6px 8px', color: '#fff', cursor: 'pointer' }}><Check size={14} style={{ transform: 'translateY(2px)' }} /></button>
+                                                    <button onClick={cancelEdit} aria-label="취소" title="취소" style={{ background: 'none', border: 'none', color: '#ef4444', opacity: 0.8, cursor: 'pointer' }}><X size={14} style={{ transform: 'translateY(2px)' }} /></button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <span style={{ color: '#e4e4e7', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</span>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ background: 'none', border: 'none', color: '#a1a1aa', opacity: 0.9, cursor: 'pointer' }}><Edit2 size={14} /></button>
+                                                        <button onClick={(ev) => deleteEvent(e.id, ev)} style={{ background: 'none', border: 'none', color: '#ef4444', opacity: 0.6, cursor: 'pointer' }}><X size={14} /></button>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     ))
                                 )}
