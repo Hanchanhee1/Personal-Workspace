@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS notification_logs (
 -- RLS 활성화
 ALTER TABLE notification_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own notification logs" ON notification_logs;
 CREATE POLICY "Users can view own notification logs"
     ON notification_logs FOR SELECT
     USING (auth.uid() = user_id);

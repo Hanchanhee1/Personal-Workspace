@@ -15,21 +15,25 @@ create table if not exists calendar_events (
 alter table calendar_events enable row level security;
 
 -- 사용자가 자신의 이벤트만 볼 수 있도록 정책 생성
+DROP POLICY IF EXISTS "Users can view their own calendar events" ON calendar_events;
 create policy "Users can view their own calendar events"
   on calendar_events for select
   using ( auth.uid() = user_id );
 
 -- 사용자가 자신의 이벤트를 삽입할 수 있도록 정책 생성
+DROP POLICY IF EXISTS "Users can insert their own calendar events" ON calendar_events;
 create policy "Users can insert their own calendar events"
   on calendar_events for insert
   with check ( auth.uid() = user_id );
 
 -- 사용자가 자신의 이벤트를 업데이트할 수 있도록 정책 생성
+DROP POLICY IF EXISTS "Users can update their own calendar events" ON calendar_events;
 create policy "Users can update their own calendar events"
   on calendar_events for update
   using ( auth.uid() = user_id );
 
 -- 사용자가 자신의 이벤트를 삭제할 수 있도록 정책 생성
+DROP POLICY IF EXISTS "Users can delete their own calendar events" ON calendar_events;
 create policy "Users can delete their own calendar events"
   on calendar_events for delete
   using ( auth.uid() = user_id );
