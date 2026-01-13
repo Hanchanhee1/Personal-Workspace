@@ -23,29 +23,29 @@ SELECT
     ce.event_date,
     au.email,
     CASE 
-        WHEN ce.event_date = CURRENT_DATE THEN 'today'
-        WHEN ce.event_date = CURRENT_DATE + INTERVAL '1 day' THEN '1_day_before'
-        WHEN ce.event_date = CURRENT_DATE + INTERVAL '3 days' THEN '3_days_before'
-        WHEN ce.event_date = CURRENT_DATE + INTERVAL '7 days' THEN '7_days_before'
+        WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date THEN 'today'
+        WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '1 day' THEN '1_day_before'
+        WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '3 days' THEN '3_days_before'
+        WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '7 days' THEN '7_days_before'
     END as notification_type
 FROM calendar_events ce
 JOIN auth.users au ON ce.user_id = au.id
 WHERE 
     (
-        ce.event_date = CURRENT_DATE OR
-        ce.event_date = CURRENT_DATE + INTERVAL '1 day' OR
-        ce.event_date = CURRENT_DATE + INTERVAL '3 days' OR
-        ce.event_date = CURRENT_DATE + INTERVAL '7 days'
+        ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date OR
+        ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '1 day' OR
+        ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '3 days' OR
+        ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '7 days'
     )
     AND NOT EXISTS (
         SELECT 1 FROM notification_logs nl 
         WHERE nl.event_id = ce.id 
         AND nl.notification_type = (
             CASE 
-                WHEN ce.event_date = CURRENT_DATE THEN 'today'
-                WHEN ce.event_date = CURRENT_DATE + INTERVAL '1 day' THEN '1_day_before'
-                WHEN ce.event_date = CURRENT_DATE + INTERVAL '3 days' THEN '3_days_before'
-                WHEN ce.event_date = CURRENT_DATE + INTERVAL '7 days' THEN '7_days_before'
+                WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date THEN 'today'
+                WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '1 day' THEN '1_day_before'
+                WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '3 days' THEN '3_days_before'
+                WHEN ce.event_date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date + INTERVAL '7 days' THEN '7_days_before'
             END
         )
     );
