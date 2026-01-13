@@ -17,7 +17,7 @@ const DiaryWidget: React.FC = () => {
                 <div style={{ cursor: 'pointer' }}>
                      <div style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', marginBottom: '8px' }}>Today</div>
                     <p className="text-body">
-                        디자인을 다시 갈아엎었다. 훨씬 깔끔해져서 마음이 편안하다. 이게 바로 "Simple is Best".
+                        디자인을 다시 갈아엎었다. 훨씬 깔끔해져서 마음이 편안하다. 이게 바로 &quot;Simple is Best&quot;.
                     </p>
                 </div>
                 
