@@ -28,6 +28,8 @@ serve(async (req) => {
 
     // 뷰에서 대기 중인 알림 조회
     const { data: pendingNotifications, error: fetchError } = await supabase
+      // 민감한 뷰는 private 스키마에서 조회
+      .schema('private')
       .from('pending_notifications')
       .select('*')
 

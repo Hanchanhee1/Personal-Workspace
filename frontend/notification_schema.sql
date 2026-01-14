@@ -15,8 +15,13 @@ CREATE POLICY "Users can view own notification logs"
     ON notification_logs FOR SELECT
     USING (auth.uid() = user_id);
 
--- 알림 대상 조회용 뷰
-CREATE OR REPLACE VIEW pending_notifications AS
+-- 알림 대상 조회용 뷰 (비공개 스키마 사용)
+CREATE SCHEMA IF NOT EXISTS private;
+REVOKE ALL ON SCHEMA private FROM anon, authenticated;
+GRANT USAGE ON SCHEMA private TO service_role;
+
+DROP VIEW IF EXISTS public.pending_notifications;
+CREATE OR REPLACE VIEW private.pending_notifications AS
 SELECT 
     ce.id as event_id,
     ce.user_id,
@@ -50,3 +55,5 @@ WHERE
             END
         )
     );
+
+GRANT SELECT ON private.pending_notifications TO service_role;
