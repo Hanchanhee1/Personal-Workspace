@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     format, 
+    parseISO,
     startOfMonth, 
     endOfMonth, 
     eachDayOfInterval, 
@@ -72,6 +73,111 @@ interface CalendarEvent {
     color: string;
 }
 
+// 오전/오후 표시용 시간 라벨 포맷
+const formatTimeLabel = (isoString: string): string => {
+    try {
+        return format(parseISO(isoString), 'a h:mm', { locale: ko });
+    } catch {
+        return '';
+    }
+};
+
+// 현재 시간을 HH:mm 형식으로 반환
+const getNowTimeValue = (): string => {
+    const now = new Date();
+    return format(now, 'HH:mm');
+};
+
+// 편집용 시간 입력 기본값을 HH:mm으로 변환
+const getEventTimeValue = (isoString: string): string => {
+    try {
+        return format(parseISO(isoString), 'HH:mm');
+    } catch {
+        return getNowTimeValue();
+    }
+};
+
+type ParsedEventInput = {
+    hours: number;
+    minutes: number;
+    title: string;
+};
+
+// 시간 입력이 비어 있거나 사용자 텍스트에 섞여 있을 때를 대비해 시간/제목을 보정
+const parseTimeParts = (rawValue: string): { hours: number; minutes: number } | null => {
+    const raw = rawValue.trim();
+    if (!raw) return null;
+
+    const timeMatch = raw.match(/^(\d{1,2}):(\d{2})$/);
+    if (timeMatch) {
+        const hours = Number(timeMatch[1]);
+        const minutes = Number(timeMatch[2]);
+        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+            return { hours, minutes };
+        }
+    }
+
+    const meridiemHeadMatch = raw.match(/^(오전|오후|AM|PM)\s*(\d{1,2})(?::(\d{2}))?$/i);
+    if (meridiemHeadMatch) {
+        const meridiem = meridiemHeadMatch[1].toLowerCase();
+        const rawHours = Number(meridiemHeadMatch[2]);
+        const minutes = Number(meridiemHeadMatch[3] ?? '0');
+        if (rawHours >= 1 && rawHours <= 12 && minutes >= 0 && minutes <= 59) {
+            const isPm = meridiem === '오후' || meridiem === 'pm';
+            const hours = rawHours % 12 + (isPm ? 12 : 0);
+            return { hours, minutes };
+        }
+    }
+
+    const meridiemTailMatch = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(오전|오후|AM|PM)$/i);
+    if (meridiemTailMatch) {
+        const rawHours = Number(meridiemTailMatch[1]);
+        const minutes = Number(meridiemTailMatch[2] ?? '0');
+        const meridiem = meridiemTailMatch[3].toLowerCase();
+        if (rawHours >= 1 && rawHours <= 12 && minutes >= 0 && minutes <= 59) {
+            const isPm = meridiem === '오후' || meridiem === 'pm';
+            const hours = rawHours % 12 + (isPm ? 12 : 0);
+            return { hours, minutes };
+        }
+    }
+
+    return null;
+};
+
+const parseEventInput = (timeValue: string, titleValue: string): ParsedEventInput => {
+    const normalizedTitle = titleValue.trim();
+    const directTime = parseTimeParts(timeValue);
+    if (directTime) {
+        return { ...directTime, title: normalizedTitle };
+    }
+
+    // "오전/오후 2:00 일정" 또는 "2:00 일정" 패턴을 지원
+    const meridiemMatch = normalizedTitle.match(/^(오전|오후|AM|PM)\s*(\d{1,2})(?::(\d{2}))?\s+(.*)$/i);
+    if (meridiemMatch) {
+        const meridiem = meridiemMatch[1].toLowerCase();
+        const rawHours = Number(meridiemMatch[2]);
+        const minutes = Number(meridiemMatch[3] ?? '0');
+        const title = meridiemMatch[4].trim();
+        if (rawHours >= 1 && rawHours <= 12 && minutes >= 0 && minutes <= 59) {
+            const isPm = meridiem === '오후' || meridiem === 'pm';
+            const hours = rawHours % 12 + (isPm ? 12 : 0);
+            return { hours, minutes, title };
+        }
+    }
+
+    const twentyFourMatch = normalizedTitle.match(/^(\d{1,2}):(\d{2})\s+(.*)$/);
+    if (twentyFourMatch) {
+        const hours = Number(twentyFourMatch[1]);
+        const minutes = Number(twentyFourMatch[2]);
+        const title = twentyFourMatch[3].trim();
+        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+            return { hours, minutes, title };
+        }
+    }
+
+    return { hours: 0, minutes: 0, title: normalizedTitle };
+};
+
 const CalendarWidget: React.FC = () => {
     const { user } = useAuth();
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -79,22 +185,25 @@ const CalendarWidget: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newEventTitle, setNewEventTitle] = useState('');
+    const [newEventTime, setNewEventTime] = useState('09:00');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
         if (!user) return;
         
         const fetchData = async () => {
-            const start = format(startOfMonth(currentDate), 'yyyy-MM-dd');
-            const end = format(endOfMonth(currentDate), 'yyyy-MM-dd');
+            const startIso = startOfMonth(currentDate).toISOString();
+            const endOfMonthDate = endOfMonth(currentDate);
+            endOfMonthDate.setHours(23,59,59,999);
+            const endIso = endOfMonthDate.toISOString();
 
             try {
                 const { data, error } = await supabase
                     .from('calendar_events')
                     .select('*')
                     .eq('user_id', user.id)
-                    .gte('event_date', start)
-                    .lte('event_date', end);
+                    .gte('event_date', startIso)
+                    .lte('event_date', endIso);
 
                 if (error) {
                     console.error('Supabase fetch error full object:', JSON.stringify(error, null, 2));
@@ -124,19 +233,26 @@ const CalendarWidget: React.FC = () => {
 
     const handleDateClick = (day: Date) => {
         setSelectedDate(day);
+        // 일정 등록 시 기본 시간을 현재 시간으로 설정
+        setNewEventTime(getNowTimeValue());
         setIsModalOpen(true);
     };
 
     const addEvent = async () => {
-        if (!user || !selectedDate || !newEventTitle.trim()) return;
+        const parsedInput = parseEventInput(newEventTime, newEventTitle);
+        if (!user || !selectedDate || !parsedInput.title) return;
+
+        const { hours, minutes, title } = parsedInput;
+        const eventDateTime = new Date(selectedDate);
+        eventDateTime.setHours(hours, minutes, 0, 0);
 
         const { data, error } = await supabase
             .from('calendar_events')
             .insert([
                 {
                     user_id: user.id,
-                    title: newEventTitle,
-                    event_date: format(selectedDate, 'yyyy-MM-dd'),
+                    title,
+                    event_date: eventDateTime.toISOString(),
                     color: '#818cf8'
                 }
             ])
@@ -170,22 +286,36 @@ const CalendarWidget: React.FC = () => {
     // Edit event state
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState('');
+    const [editingTime, setEditingTime] = useState(getNowTimeValue());
 
     const startEdit = (e: CalendarEvent) => {
         setEditingEventId(e.id);
         setEditingTitle(e.title);
+        // 수정 시 현재 시간으로 표시
+        setEditingTime(getNowTimeValue());
     };
 
     const cancelEdit = () => {
         setEditingEventId(null);
         setEditingTitle('');
+        setEditingTime(getNowTimeValue());
     };
 
     const saveEdit = async (id: string) => {
         if (!editingTitle.trim()) return;
+        const targetEvent = events.find(ev => ev.id === id);
+        if (!targetEvent) return;
+        const [hours, minutes] = (editingTime || '00:00').split(':').map(Number);
+        const eventDateTime = new Date(targetEvent.event_date);
+        if (!Number.isNaN(eventDateTime.getTime())) {
+            eventDateTime.setHours(hours, minutes, 0, 0);
+        }
         const { data, error } = await supabase
             .from('calendar_events')
-            .update({ title: editingTitle.trim() })
+            .update({
+                title: editingTitle.trim(),
+                event_date: Number.isNaN(eventDateTime.getTime()) ? targetEvent.event_date : eventDateTime.toISOString()
+            })
             .eq('id', id)
             .select()
             .single();
@@ -259,7 +389,28 @@ const CalendarWidget: React.FC = () => {
             backgroundColor: isOtherMonth ? 'rgba(0,0,0,0.1)' : 'transparent',
             transition: 'background-color 0.2s',
             position: 'relative' as const
-        })
+        }),
+        eventChip: {
+            fontSize: '0.6rem', 
+            color: '#e4e4e7', 
+            backgroundColor: 'rgba(129, 140, 248, 0.15)', 
+            padding: '2px 4px', 
+            borderRadius: '4px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+        },
+        eventTime: {
+            marginRight: '6px',
+            fontSize: '0.65rem',
+            opacity: 0.95
+        },
+        eventTitle: {
+            verticalAlign: 'middle',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap' as const
+        }
     };
 
     return (
@@ -318,7 +469,13 @@ const CalendarWidget: React.FC = () => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const holiday = HOLIDAYS_2026[dateStr];
                     const jpHoliday = JP_HOLIDAYS_2026[dateStr];
-                    const dayEvents = events.filter(e => e.event_date === dateStr);
+                    const dayEvents = events.filter(e => {
+                        try {
+                            return format(parseISO(e.event_date), 'yyyy-MM-dd') === dateStr;
+                        } catch {
+                            return e.event_date === dateStr;
+                        }
+                    });
                     const isOtherMonth = !isSameMonth(day, monthStart);
                     const isTodayNow = isToday(day);
                     const Sunday = day.getDay() === 0;
@@ -363,25 +520,26 @@ const CalendarWidget: React.FC = () => {
                             
                             {/* 일정 목록 */}
                             <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                {dayEvents.slice(0, 2).map(e => (
-                                    <div 
-                                        key={e.id} 
-                                        style={{ 
-                                            fontSize: '0.6rem', 
-                                            color: '#e4e4e7', 
-                                            backgroundColor: 'rgba(129, 140, 248, 0.15)', 
-                                            padding: '2px 4px', 
-                                            borderRadius: '4px',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                            borderLeft: `2px solid ${e.color || '#818cf8'}`
-                                        }}
-                                        title={e.title}
-                                    >
-                                        {e.title}
-                                    </div>
-                                ))}
+                                {dayEvents.slice(0, 2).map(e => {
+                                    const timeLabel = formatTimeLabel(e.event_date);
+
+                                    return (
+                                        <div 
+                                            key={e.id} 
+                                            style={{ 
+                                                ...styles.eventChip,
+                                                borderTop: '1px solid transparent',
+                                                borderRight: '1px solid transparent',
+                                                borderBottom: '1px solid transparent',
+                                                borderLeft: `2px solid ${e.color || '#818cf8'}`
+                                            }}
+                                            title={e.title}
+                                        >
+                                            <span style={styles.eventTime}>{timeLabel}</span>
+                                            <span style={styles.eventTitle}>{e.title}</span>
+                                        </div>
+                                    );
+                                })} 
                                 {dayEvents.length > 2 && (
                                     <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', paddingLeft: '2px' }}>
                                         + {dayEvents.length - 2}개 더
@@ -412,7 +570,7 @@ const CalendarWidget: React.FC = () => {
                         <motion.div 
                             initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
                             onClick={e => e.stopPropagation()}
-                            style={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', width: '100%', maxWidth: '340px', overflow: 'hidden' }}
+                            style={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', width: '100%', maxWidth: 'calc(340px + 13rem)', overflow: 'hidden' }}
                         >
                             <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
@@ -427,13 +585,30 @@ const CalendarWidget: React.FC = () => {
                             </div>
 
                             <div style={{ padding: '20px', maxHeight: '200px', overflowY: 'auto' }}>
-                                {events.filter(e => e.event_date === format(selectedDate, 'yyyy-MM-dd')).length === 0 ? (
-                                    <div style={{ textAlign: 'center', padding: '20px', color: '#3f3f46', fontSize: '0.9rem' }}>등록된 일정이 없습니다</div>
-                                ) : (
-                                    events.filter(e => e.event_date === format(selectedDate, 'yyyy-MM-dd')).map(e => (
+                                {(() => {
+                                    const eventsForDay = events.filter(e => {
+                                        try {
+                                            return format(parseISO(e.event_date), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
+                                        } catch {
+                                            return e.event_date === format(selectedDate, 'yyyy-MM-dd');
+                                        }
+                                    });
+
+                                    if (eventsForDay.length === 0) {
+                                        return <div style={{ textAlign: 'center', padding: '20px', color: '#3f3f46', fontSize: '0.9rem' }}>등록된 일정이 없습니다</div>;
+                                    }
+
+                                    return eventsForDay.map(e => (
                                         <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '10px', marginBottom: '8px' }}>
                                             {editingEventId === e.id ? (
                                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+                                                    <input
+                                                        type="time"
+                                                        value={editingTime}
+                                                        onChange={ev => setEditingTime(ev.target.value)}
+                                                        step={60}
+                                                        style={{ width: '132px', minWidth: '132px', backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '6px 8px', color: '#fff' }}
+                                                    />
                                                     <input
                                                         type="text"
                                                         value={editingTitle}
@@ -445,7 +620,12 @@ const CalendarWidget: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <span style={{ color: '#e4e4e7', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ color: '#e4e4e7', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(() => {
+                                                            const label = formatTimeLabel(e.event_date);
+                                                            return label ? `${label} ${e.title}` : e.title;
+                                                        })()}</span>
+                                                    </div>
                                                     <div style={{ display: 'flex', gap: '8px' }}>
                                                         <button onClick={(ev) => { ev.stopPropagation(); startEdit(e); }} style={{ background: 'none', border: 'none', color: '#a1a1aa', opacity: 0.9, cursor: 'pointer' }}><Edit2 size={14} /></button>
                                                         <button onClick={(ev) => deleteEvent(e.id, ev)} style={{ background: 'none', border: 'none', color: '#ef4444', opacity: 0.6, cursor: 'pointer' }}><X size={14} /></button>
@@ -453,18 +633,25 @@ const CalendarWidget: React.FC = () => {
                                                 </>
                                             )}
                                         </div>
-                                    ))
-                                )}
+                                    ));
+                                })()}
                             </div>
 
                             <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                    <input
+                                        type="time"
+                                        value={newEventTime}
+                                        onChange={e => setNewEventTime(e.target.value)}
+                                        step={60}
+                                        style={{ width: '136px', minWidth: '120px', flexShrink: 0, height: '40px', boxSizing: 'border-box', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '6px 8px', color: '#fff', fontSize: '0.95rem', outline: 'none' }}
+                                    />
                                     <input 
                                         type="text" value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} placeholder="일정 입력..."
-                                        style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 12px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                                        style={{ flex: 1, minWidth: 0, height: '40px', boxSizing: 'border-box', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 12px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
                                         onKeyPress={e => e.key === 'Enter' && addEvent()}
                                     />
-                                    <button onClick={addEvent} style={{ backgroundColor: '#818cf8', border: 'none', borderRadius: '10px', padding: '8px', color: '#fff', cursor: 'pointer' }}><Plus size={20} /></button>
+                                    <button onClick={addEvent} style={{ backgroundColor: '#818cf8', border: 'none', borderRadius: '10px', width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}><Plus size={18} /></button>
                                 </div>
                             </div>
                         </motion.div>

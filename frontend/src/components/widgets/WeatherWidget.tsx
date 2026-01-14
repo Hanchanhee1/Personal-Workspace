@@ -216,6 +216,13 @@ const WeatherWidget: React.FC = () => {
         await fetchWeather(city.latitude, city.longitude, city.name);
     };
 
+    const selectFavoriteCity = async (fav: FavoriteCity) => {
+        setSearchMode(false);
+        setSearchQuery('');
+        setSearchResults([]);
+        await fetchWeather(fav.latitude, fav.longitude, fav.city_name);
+    };
+
     // 즐겨찾기 추가
     const addToFavorites = async () => {
         if (!user || !weather || !currentLocation) return;
@@ -283,7 +290,7 @@ const WeatherWidget: React.FC = () => {
     // 로딩 상태
     if (loading) {
         return (
-            <div className="minimal-card h-full flex items-center justify-center">
+            <div className="minimal-card h-full w-full flex items-center justify-center" style={{ width: '100%', height: '100%' }}>
                 <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -364,13 +371,17 @@ const WeatherWidget: React.FC = () => {
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: 20 }}
                                         transition={{ delay: index * 0.05 }}
+                                        onClick={() => selectFavoriteCity(fav)}
                                         className="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer rounded-lg mb-2 flex justify-between items-center"
                                     >
-                                        <div onClick={() => fetchWeather(fav.latitude, fav.longitude, fav.city_name)}>
+                                        <div>
                                             <div className="font-medium">{fav.city_name}</div>
                                         </div>
                                         <motion.button 
-                                            onClick={() => removeFavorite(fav.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeFavorite(fav.id);
+                                            }}
                                             whileHover={{ scale: 1.2, rotate: 90 }}
                                             whileTap={{ scale: 0.9 }}
                                             className="p-1"
@@ -403,7 +414,9 @@ const WeatherWidget: React.FC = () => {
                 background: theme.background,
                 color: theme.textColor,
                 position: 'relative',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                paddingTop: '10px',
+                paddingBottom: '10px'
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -423,7 +436,7 @@ const WeatherWidget: React.FC = () => {
                     {weather?.cityName.toUpperCase()}
                 </h3>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" style={{ transform: 'translateY(0.3rem)' }}>
                     {/* 검색 버튼 */}
                     <motion.button 
                         onClick={(e) => {
@@ -494,7 +507,7 @@ const WeatherWidget: React.FC = () => {
                     </motion.div>
                     
                     {/* 온도 표시 (오른쪽) */}
-                    <div style={{ marginLeft: '30px' }}>
+                    <div style={{ marginLeft: '30px', transform: 'translateX(1.5rem)' }}>
                         <motion.div 
                             key={weather?.temperature}
                             initial={{ scale: 0.5, opacity: 0 }}
@@ -520,7 +533,8 @@ const WeatherWidget: React.FC = () => {
                             style={{ 
                                 color: theme.textColor, 
                                 fontSize: '1.2rem',
-                                opacity: 0.9
+                                opacity: 0.9,
+                                marginBottom: '3px'
                             }}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 0.9, y: 0 }}
@@ -543,7 +557,8 @@ const WeatherWidget: React.FC = () => {
                     backdropFilter: 'blur(10px)',
                     padding: '12px 16px',
                     borderRadius: '12px',
-                    color: theme.textColor
+                    color: theme.textColor,
+                    transform: 'translateY(0.2rem)'
                 }}
             >
                 <Droplets size={18} />

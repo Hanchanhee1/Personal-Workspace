@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import BackgroundEffect from '@/components/layout/BackgroundEffect';
 
 const FindId: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -30,9 +31,12 @@ const FindId: React.FC = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#121212',
+      background: 'transparent',
       color: '#222',
+      position: 'relative',
     }}>
+      {/* 대시보드와 동일한 은하수 배경 */}
+      <BackgroundEffect />
       <div style={{
         width: '100%',
         maxWidth: 380,
@@ -93,7 +97,7 @@ const FindId: React.FC = () => {
           }}>{loading ? '조회 중...' : '아이디 찾기'}</button>
         </form>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 18, marginTop: 24, fontSize: 13, color: '#aaa' }}>
-          <a href="/login" style={{ textDecoration: 'underline', color: '#aaa' }}>로그인</a>
+          <a href="/" style={{ textDecoration: 'underline', color: '#aaa' }}>로그인</a>
           <a href="/find-password" style={{ textDecoration: 'underline', color: '#aaa' }}>비밀번호 찾기</a>
           <a href="/sign-up" style={{ textDecoration: 'underline', color: '#aaa' }}>회원가입</a>
         </div>

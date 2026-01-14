@@ -6,7 +6,8 @@ create table if not exists calendar_events (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references auth.users(id),
   title text not null,
-  event_date date not null,
+  -- 시간까지 저장하려면 date가 아닌 timestamptz가 필요합니다
+  event_date timestamptz not null,
   color text default '#818cf8',
   created_at timestamp with time zone default now()
 );

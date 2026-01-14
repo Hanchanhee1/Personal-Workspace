@@ -17,6 +17,72 @@
   background-color: var(--background);
 }
 
+.dashboardGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  grid-auto-rows: minmax(240px, auto);
+}
+
+.weatherCard {
+  grid-column: span 1;
+  grid-row: span 1;
+}
+
+.todoCard {
+  grid-column: span 1;
+  grid-row: span 2;
+}
+
+.calendarCard {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.diaryCard {
+  grid-column: span 1;
+  grid-row: span 1;
+}
+
+.mapCard {
+  grid-column: span 4;
+  grid-row: span 2;
+  min-height: 400px;
+}
+
+@media (max-width: 1200px) {
+  .dashboardGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .calendarCard {
+    grid-column: span 2;
+  }
+
+  .mapCard {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .weatherCard,
+  .todoCard,
+  .calendarCard,
+  .diaryCard,
+  .mapCard {
+    grid-column: span 1;
+    grid-row: span 1;
+  }
+
+  .mapCard {
+    min-height: 320px;
+  }
+}
+
 .main {
   display: flex;
   min-height: 100vh;

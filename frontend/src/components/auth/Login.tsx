@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
 import { LogIn, Mail } from 'lucide-react';
+import BackgroundEffect from '@/components/layout/BackgroundEffect';
 
 const Login: React.FC = () => {
   const { signInWithGoogle, signInWithEmail } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
@@ -46,9 +48,12 @@ const Login: React.FC = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#121212',
+      background: 'transparent',
       color: '#222',
+      position: 'relative',
     }}>
+      {/* 대시보드와 동일한 은하수 배경 */}
+      <BackgroundEffect />
       <div style={{
         width: '100%',
         maxWidth: 380,
@@ -67,11 +72,6 @@ const Login: React.FC = () => {
           <div style={{ fontSize: 15, color: '#888', marginBottom: 0 }}>나만의 워크스페이스 로그인</div>
         </div>
 
-        {/* 탭 메뉴 (단일 탭만, 확장 대비) */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 24, borderRadius: 12, overflow: 'hidden', background: '#f7f7f7', border: '1px solid #e5e7eb' }}>
-          <div style={{ flex: 1, background: '#fff', color: '#00c73c', fontWeight: 700, padding: '10px 0', fontSize: 15, border: 'none', outline: 'none', cursor: 'default', textAlign: 'center' }}>이메일 로그인</div>
-        </div>
-
         {error && (
           <div style={{ marginBottom: 16, padding: '10px 0', background: '#ffeaea', color: '#d32f2f', borderRadius: 8, fontSize: 14, border: '1px solid #ffd6d6' }}>{error}</div>
         )}
@@ -85,6 +85,27 @@ const Login: React.FC = () => {
             placeholder="이메일 주소 입력"
             value={email}
             onChange={e => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '14px 16px',
+              fontSize: 16,
+              border: '1.5px solid #e5e7eb',
+              borderRadius: 10,
+              outline: 'none',
+              marginBottom: 8,
+              background: '#fff',
+              color: '#222',
+              boxSizing: 'border-box',
+              transition: 'border 0.2s',
+            }}
+          />
+          <input
+            type="password"
+            placeholder="비밀번호 입력"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
             required
             disabled={loading}
             style={{
@@ -120,11 +141,8 @@ const Login: React.FC = () => {
             }}
           >
             {/* <Mail size={18} style={{ marginRight: 6, verticalAlign: -2 }} /> */}
-            로그인 링크 받기
+            로그인
           </button>
-          <div style={{ fontSize: 13, color: '#888', marginBottom: 4, marginTop: -2, textAlign: 'left' }}>
-            <span style={{ color: '#6C63FF', fontWeight: 600 }}>로그인 링크 받기란?</span> 입력한 이메일로 로그인용 링크가 전송됩니다.<br />메일함에서 링크를 클릭하면 바로 로그인됩니다.
-          </div>
         </form>
 
         <div style={{ display: 'flex', alignItems: 'center', margin: '18px 0 10px 0' }}>

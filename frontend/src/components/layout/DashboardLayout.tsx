@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Star } from 'lucide-react';
+import { LogIn, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import BackgroundEffect from './BackgroundEffect';
@@ -12,7 +13,8 @@ interface DashboardLayoutProps {
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -35,18 +37,27 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     second: '2-digit',
     hour12: true
   });
+  const displayName = user?.user_metadata?.name || user?.user_metadata?.full_name || user?.user_metadata?.nickname;
 
   return (
     <>
       <BackgroundEffect />
-      {/* 로그아웃 별 버튼 - 백그라운드 오른쪽 상단 고정 */}
+      {/* 로그인 버튼 - 헤더 영역에 고정 */}
       <button
-        onClick={signOut}
-        title="로그아웃"
+        onClick={async () => {
+          if (user) {
+            // 로그아웃 후 메인 화면 유지
+            await signOut();
+            window.location.reload();
+            return;
+          }
+          router.push('/login');
+        }}
+        title={user ? '로그아웃' : '로그인'}
         style={{
-          position: 'fixed',
-          top: 32,
-          right: 48,
+          position: 'absolute',
+          top: 15,
+          right: 15,
           background: 'none',
           border: 'none',
           cursor: 'pointer',
@@ -55,13 +66,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          filter: 'drop-shadow(0 0 8px #ffe06688) drop-shadow(0 0 2px #fff8)',
+          filter: 'drop-shadow(0 0 6px rgba(129, 140, 248, 0.7))',
           transition: 'transform 0.15s',
         }}
         onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.15)')}
         onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}
       >
-        <Star size={36} color="#FFD600" fill="#FFD600" strokeWidth={1.5} style={{ filter: 'drop-shadow(0 0 6px #FFD60088)' }} />
+        {user ? (
+          <LogOut size={30} color="#818cf8" strokeWidth={2} />
+        ) : (
+          <LogIn size={30} color="#818cf8" strokeWidth={2} />
+        )}
       </button>
       <div className="layout-container" style={{ 
         padding: '60px 40px', 
@@ -75,6 +90,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           background: 'rgba(255, 255, 255, 0.03)',
           backdropFilter: 'blur(10px)',
           padding: '24px 32px',
+          paddingRight: '96px',
           borderRadius: '24px',
           border: '1px solid rgba(255, 255, 255, 0.05)'
         }}>
@@ -82,9 +98,16 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <h1 className="text-h1" style={{ marginBottom: '8px', color: '#fff', textShadow: '0 0 20px rgba(129, 140, 248, 0.3)' }}>
               Personal Workspace.
             </h1>
-            <p className="text-body" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>오늘 하루도 차분하게, 찬희님</p>
+            <p className="text-body" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+              오늘 하루도 차분하게
+              {displayName && (
+                <>
+                  , <span style={{ fontWeight: 700 }}>{displayName}</span>님
+                </>
+              )}
+            </p>
           </div>
-          <div className="text-right" style={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 300 }}>
+          <div className="text-right" style={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 300, transform: 'translate(3.5rem, 1.5rem)' }}>
             <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>{formattedDate}</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 500, color: '#fff' }}>{formattedTime}</div>
           </div>

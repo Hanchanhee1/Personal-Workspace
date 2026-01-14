@@ -271,7 +271,7 @@ INSERT INTO calendar_events (user_id, title, event_date)
 VALUES (
   'YOUR_USER_ID',
   '테스트 일정',
-  CURRENT_DATE + INTERVAL '7 days'
+  CURRENT_TIMESTAMP + INTERVAL '7 days'
 );
 ```
 
