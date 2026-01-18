@@ -1,40 +1,53 @@
-// Supabase Edge Function: 캘린더 이벤트 알림 발송
+// Supabase Edge Function: Resend 이메일로 캘린더 알림 발송
 // 이 함수는 매일 호출되어야 합니다 (cron 또는 스케줄러를 통해)
 
+// @ts-expect-error - Deno runtime import is resolved in Edge Functions.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-expect-error - Deno runtime import is resolved in Edge Functions.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
-  // CORS preflight 요청 처리
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Service Role Key를 사용하여 Supabase 클라이언트 생성
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? ''
+    const resendFrom = Deno.env.get('RESEND_FROM') ?? ''
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase 환경 변수가 누락되었습니다')
     }
 
+    if (!resendApiKey) {
+      throw new Error('RESEND_API_KEY 환경 변수가 누락되었습니다')
+    }
+
+    if (!resendFrom) {
+      throw new Error('RESEND_FROM 환경 변수가 누락되었습니다')
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // 뷰에서 대기 중인 알림 조회
     const { data: pendingNotifications, error: fetchError } = await supabase
-      // 민감한 뷰는 private 스키마에서 조회
       .schema('private')
       .from('pending_notifications')
       .select('*')
 
     if (fetchError) {
-      console.error('Error fetching pending notifications:', fetchError)
       throw fetchError
     }
 
@@ -47,19 +60,17 @@ serve(async (req) => {
 
     const results = []
     
-    // 각 알림 처리
     for (const notification of pendingNotifications) {
       try {
-        // 이메일 알림 발송
-        const emailResult = await sendEmailNotification(
-          supabase,
+        await sendEmailViaResend(
+          resendApiKey,
+          resendFrom,
           notification.email,
           notification.title,
           notification.event_date,
           notification.notification_type
         )
 
-        // 알림 로그 기록
         const { error: logError } = await supabase
           .from('notification_logs')
           .insert({
@@ -80,13 +91,16 @@ serve(async (req) => {
         })
       } catch (error) {
         console.error(`Error processing notification for event ${notification.event_id}:`, error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         results.push({
           event_id: notification.event_id,
           email: notification.email,
           status: 'failed',
-          error: error.message
+          error: errorMessage
         })
       }
+      // Avoid hitting Resend's 2 req/sec rate limit.
+      await sleep(600)
     }
 
     return new Response(
@@ -99,21 +113,22 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Error in send-notifications function:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })
 
-async function sendEmailNotification(
-  supabase: any,
+async function sendEmailViaResend(
+  apiKey: string,
+  fromEmail: string,
   email: string,
   title: string,
   eventDate: string,
   notificationType: string
 ) {
-  // 알림 타입에 따른 메시지 가져오기
   const daysUntil = getDaysUntilMessage(notificationType)
   const subject = `📅 캘린더 알림: ${title}`
   
@@ -172,26 +187,44 @@ ${daysUntil}
 일정이 다가오고 있습니다. 확인해주세요!
   `
 
-  // Supabase 내장 이메일 기능 또는 외부 서비스 사용
-  // 참고: Supabase에는 직접적인 이메일 API가 없으므로 다음 중 하나를 사용해야 합니다:
-  // 1. Supabase Auth 이메일 (인증 이메일에 제한됨)
-  // 2. Resend, SendGrid 등의 외부 서비스
-  // 3. 외부 API를 호출하는 데이터베이스 함수
-  
-  // 현재는 데이터베이스 함수를 사용하여 이메일을 발송합니다
-  // 이메일 서비스 설정이 필요합니다
-  const { error } = await supabase.rpc('send_email_notification', {
-    p_email: email,
-    p_subject: subject,
-    p_html_content: htmlContent,
-    p_text_content: textContent
-  })
+  const maxAttempts = 3
+  let attempt = 0
 
-  if (error) {
-    throw new Error(`Failed to send email: ${error.message}`)
+  while (attempt < maxAttempts) {
+    attempt += 1
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: fromEmail,
+        to: email,
+        subject: subject,
+        html: htmlContent,
+        text: textContent,
+      }),
+    })
+
+    if (response.ok) {
+      return await response.json()
+    }
+
+    const error = await response.json()
+    const statusCode = typeof error?.statusCode === 'number' ? error.statusCode : response.status
+    if (statusCode === 429 && attempt < maxAttempts) {
+      // Basic backoff for rate limit.
+      await sleep(500 * attempt)
+      continue
+    }
+
+    throw new Error(`Resend API error: ${JSON.stringify(error)}`)
   }
+}
 
-  return { success: true }
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function getDaysUntilMessage(notificationType: string): string {

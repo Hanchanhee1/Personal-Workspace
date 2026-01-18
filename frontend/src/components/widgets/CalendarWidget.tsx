@@ -271,13 +271,24 @@ const CalendarWidget: React.FC = () => {
 
     const deleteEvent = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        const { error } = await supabase
+        if (!user) {
+            alert('로그인이 필요합니다.');
+            return;
+        }
+
+        const { data, error } = await supabase
             .from('calendar_events')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .select('id');
 
         if (error) {
             console.error('Error deleting event:', error);
+            alert('일정 삭제에 실패했습니다. 콘솔을 확인하세요.');
+        } else if (!data || data.length === 0) {
+            console.warn('No rows deleted for calendar event', { id, user_id: user.id });
+            alert('삭제 권한이 없거나 이미 삭제된 일정입니다.');
         } else {
             setEvents(events.filter(event => event.id !== id));
         }
@@ -396,6 +407,9 @@ const CalendarWidget: React.FC = () => {
             backgroundColor: 'rgba(129, 140, 248, 0.15)', 
             padding: '2px 4px', 
             borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
@@ -403,10 +417,15 @@ const CalendarWidget: React.FC = () => {
         eventTime: {
             marginRight: '6px',
             fontSize: '0.65rem',
-            opacity: 0.95
+            opacity: 0.95,
+            flexShrink: 0,
+            fontVariantNumeric: 'tabular-nums'
         },
         eventTitle: {
-            verticalAlign: 'middle',
+            minWidth: 0,
+            position: 'relative' as const,
+            top: '-0.135px',
+            left: '-4px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap' as const
