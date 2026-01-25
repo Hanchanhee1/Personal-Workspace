@@ -1,4 +1,0 @@
-# Ignore environment files that may cause parsing errors
-.env.local
-.env
-.env.*.local

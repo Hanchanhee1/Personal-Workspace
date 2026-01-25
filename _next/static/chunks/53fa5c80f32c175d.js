@@ -1,0 +1,1 @@
+(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,58525,t=>{t.v("/_next/static/media/marker-shadow.f228ba2c.png")}]);
