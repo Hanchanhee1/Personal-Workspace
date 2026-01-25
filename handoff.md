@@ -254,3 +254,33 @@
 - 버전: v5.2
 - 작업: v4.5 상태로 복원.
 - 메모: 캘린더 본문이 좁은 화면에서 세로 스택되도록 원래 분기 로직을 복원.
+
+## 2026-01-25
+- 버전: v5.3
+- 작업: GitHub Pages(유저/조직 페이지)용 정적 배포 설정 추가.
+- 메모: `frontend/next.config.ts`에 `output: "export"`/`trailingSlash`/`images.unoptimized` 설정을 추가하고, 브랜치 배포 방식으로 안내하기 위해 워크플로우는 제거함. 로컬 빌드는 Node 20.9+ 필요(현재 Node 18로 빌드 실패)하여 `frontend/out` 생성 및 `gh-pages` 브랜치 배포는 보류.
+
+## 2026-01-25
+- 버전: v5.4
+- 작업: 캘린더 위젯 타입 오류 수정.
+- 메모: `startOfWeek` 옵션의 `weekStartsOn` 타입을 리터럴로 지정해 빌드 타입 오류를 해결.
+
+## 2026-01-25
+- 버전: v5.5
+- 작업: 캘린더 위젯 타입 오류 추가 수정.
+- 메모: `weekStartsOn` 옵션을 `StartOfWeekOptions`로 제한하고 `scrollbarWidth`를 리터럴 타입으로 지정해 빌드 타입 오류를 해결.
+
+## 2026-01-25
+- 버전: v5.6
+- 작업: 캘린더 위젯 스타일 타입 오류 추가 수정.
+- 메모: `scrollbarWidth`/`WebkitBoxOrient` 관련 타입 오류를 피하기 위해 일부 스타일 객체를 `CSSProperties`로 명시.
+
+## 2026-01-25
+- 버전: v5.7
+- 작업: 캘린더 위젯 스타일 타입 오류 추가 보정.
+- 메모: 타입 오류가 발생한 스타일 적용 지점에서 `CSSProperties` 캐스팅을 추가.
+
+## 2026-01-25
+- 버전: v5.8
+- 작업: Supabase Edge Function 타입 오류 빌드 제외 처리.
+- 메모: `frontend/tsconfig.json`에서 `supabase/functions` 경로를 제외해 `Deno` 타입 오류를 막음.

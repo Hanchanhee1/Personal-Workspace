@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { 
     format, 
     parseISO,
@@ -16,6 +17,7 @@ import {
     addDays,
     startOfDay,
 } from 'date-fns';
+import type { StartOfWeekOptions } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, Edit2, Check, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -367,7 +369,7 @@ const CalendarWidget: React.FC = () => {
 
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
-    const weekStartOptions = { weekStartsOn: 0, locale: ko };
+    const weekStartOptions = { weekStartsOn: 0 as const, locale: ko } satisfies StartOfWeekOptions<Date>;
     const startDate = startOfWeek(monthStart, weekStartOptions);
     const endDate = endOfWeek(monthEnd, weekStartOptions);
 
@@ -556,9 +558,9 @@ const CalendarWidget: React.FC = () => {
             paddingRight: '8px',
             paddingLeft: '2px',
             paddingTop: '2px',
-            scrollbarWidth: 'thin',
+            scrollbarWidth: 'thin' as const,
             scrollbarColor: 'rgba(129,140,248,0.55) transparent'
-        },
+        } as CSSProperties,
         sideItem: {
             display: 'flex',
             flexDirection: 'column' as const,
@@ -701,7 +703,7 @@ const CalendarWidget: React.FC = () => {
             WebkitBoxOrient: 'vertical',
             whiteSpace: 'normal' as const,
             lineHeight: '1.2'
-        },
+        } as CSSProperties,
         eventList: {
             marginTop: 'auto',
             display: 'flex',
@@ -712,9 +714,9 @@ const CalendarWidget: React.FC = () => {
             overflowY: 'auto' as const,
             paddingRight: '2px',
             paddingBottom: '6px',
-            scrollbarWidth: 'thin',
+            scrollbarWidth: 'thin' as const,
             scrollbarColor: 'rgba(129,140,248,0.55) transparent'
-        },
+        } as CSSProperties,
         eventListFade: {
             position: 'absolute' as const,
             left: 0,
@@ -854,7 +856,7 @@ const CalendarWidget: React.FC = () => {
                                     
                                     {/* 일정 목록 */}
                                     <div style={{ position: 'relative', marginTop: 'auto' }}>
-                                        <div style={styles.eventList}>
+                                        <div style={styles.eventList as CSSProperties}>
                                             {dayEvents.map(e => {
                                                 const timeLabel = formatTimeLabel(e.event_date);
                                                 const accent = getEventAccent(e);
@@ -873,12 +875,12 @@ const CalendarWidget: React.FC = () => {
                                                         title={e.title}
                                                     >
                                                         <span style={styles.eventTime}>{timeLabel}</span>
-                                                        <span style={styles.eventTitle}>{e.title}</span>
+                                                        <span style={styles.eventTitle as CSSProperties}>{e.title}</span>
                                                     </div>
                                                 );
                                             })}
                                         </div>
-                                        {dayEvents.length > 3 && <div style={styles.eventListFade} />}
+                                        {dayEvents.length > 3 && <div style={styles.eventListFade as CSSProperties} />}
                                     </div>
                                 </div>
                             );
