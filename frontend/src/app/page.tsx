@@ -3,7 +3,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import Login from "@/components/auth/Login";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import WeatherWidget from "@/components/widgets/WeatherWidget";
 import TodoWidget from "@/components/widgets/TodoWidget";
 import CalendarWidget from "@/components/widgets/CalendarWidget";
 import DiaryWidget from "@/components/widgets/DiaryWidget";
@@ -39,11 +38,6 @@ export default function Home() {
     <DashboardLayout>
       <div className={styles.dashboardGrid}>
         
-        {/* 날씨 위젯: 1열 - 정사각형 */}
-        <div className={styles.weatherCard}>
-          <WeatherWidget />
-        </div>
-
         {/* 할 일 목록: 1열 - 세로로 긴 형태 */}
         <div className={styles.todoCard}>
           <TodoWidget />

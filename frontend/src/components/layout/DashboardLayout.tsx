@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import BackgroundEffect from './BackgroundEffect';
+import HeaderWeather from '@/components/widgets/HeaderWeather';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -78,14 +79,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           <LogIn size={30} color="#818cf8" strokeWidth={2} />
         )}
       </button>
-      <div className="layout-container" style={{ 
-        padding: '60px 40px', 
-        maxWidth: '1400px', 
-        margin: '0 auto',
-        position: 'relative',
-        zIndex: 1
-      }}>
-        <header className="flex justify-between items-end mb-4 relative" style={{ 
+      <div className="layout-container">
+        <header className="flex justify-between items-end mb-4 relative dashboard-header" style={{ 
           marginBottom: '60px',
           background: 'rgba(255, 255, 255, 0.03)',
           backdropFilter: 'blur(10px)',
@@ -107,9 +102,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               )}
             </p>
           </div>
-          <div className="text-right" style={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 300, transform: 'translate(3.5rem, 1.5rem)' }}>
-            <div style={{ fontSize: '0.9rem', marginBottom: '4px' }}>{formattedDate}</div>
+          <div
+            className="text-right dashboard-header-right"
+            style={{
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontWeight: 300,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: '6px',
+            }}
+          >
+            <div style={{ fontSize: '0.9rem' }}>{formattedDate}</div>
             <div style={{ fontSize: '1.5rem', fontWeight: 500, color: '#fff' }}>{formattedTime}</div>
+            <div style={{ marginTop: '0.4rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <HeaderWeather />
+            </div>
           </div>
           {/* ...existing code... */}
         </header>

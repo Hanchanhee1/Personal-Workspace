@@ -13,6 +13,8 @@ import {
     startOfWeek, 
     endOfWeek, 
     isSameMonth,
+    addDays,
+    startOfDay,
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Plus, X, Edit2, Check, Calendar as CalendarIcon, AlertCircle } from 'lucide-react';
@@ -95,6 +97,20 @@ const getEventTimeValue = (isoString: string): string => {
     } catch {
         return getNowTimeValue();
     }
+};
+
+const EVENT_PALETTE = ['#818cf8', '#22d3ee', '#34d399', '#f97316', '#f43f5e', '#a855f7', '#eab308'];
+
+const getEventAccent = (event: CalendarEvent): string => {
+    if (event.color) return event.color;
+    const seed = `${event.id}-${event.title}`;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+        hash = (hash << 5) - hash + seed.charCodeAt(i);
+        hash |= 0;
+    }
+    const index = Math.abs(hash) % EVENT_PALETTE.length;
+    return EVENT_PALETTE[index];
 };
 
 type ParsedEventInput = {
@@ -187,6 +203,8 @@ const CalendarWidget: React.FC = () => {
     const [newEventTitle, setNewEventTitle] = useState('');
     const [newEventTime, setNewEventTime] = useState('09:00');
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [isNarrow, setIsNarrow] = useState(false);
+    const [overviewTab, setOverviewTab] = useState<'today' | 'all'>('today');
 
     useEffect(() => {
         if (!user) return;
@@ -227,6 +245,13 @@ const CalendarWidget: React.FC = () => {
 
         fetchData();
     }, [user, currentDate]);
+
+    useEffect(() => {
+        const checkLayout = () => setIsNarrow(window.innerWidth < 980);
+        checkLayout();
+        window.addEventListener('resize', checkLayout);
+        return () => window.removeEventListener('resize', checkLayout);
+    }, []);
 
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
@@ -342,84 +367,327 @@ const CalendarWidget: React.FC = () => {
 
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
-    const startDate = startOfWeek(monthStart);
-    const endDate = endOfWeek(monthEnd);
+    const weekStartOptions = { weekStartsOn: 0, locale: ko };
+    const startDate = startOfWeek(monthStart, weekStartOptions);
+    const endDate = endOfWeek(monthEnd, weekStartOptions);
 
     const calendarDays = eachDayOfInterval({
         start: startDate,
         end: endDate,
     });
 
-    const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const weekDays = Array.from({ length: 7 }, (_, index) =>
+        format(addDays(startDate, index), 'EEE', { locale: ko }).toUpperCase()
+    );
 
     // 선택된 날짜의 공휴일 정보 계산
     const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
     const selectedHoliday = selectedDateStr ? HOLIDAYS_2026[selectedDateStr] : undefined;
     const selectedJpHoliday = selectedDateStr ? JP_HOLIDAYS_2026[selectedDateStr] : undefined;
 
+    const overviewYear = currentDate.getFullYear();
+    const overviewMonth = currentDate.getMonth();
+    const overviewStart = startOfMonth(currentDate);
+    const overviewEnd = endOfMonth(currentDate);
+    const overviewMonthLabel = format(currentDate, 'M월', { locale: ko });
+    const overviewYearLabel = format(currentDate, 'yyyy년', { locale: ko });
+
+    const mergedHolidays = [
+        ...Object.entries(HOLIDAYS_2026)
+            .filter(([date]) => date.startsWith(`${overviewYear}-${String(overviewMonth + 1).padStart(2, '0')}-`))
+            .map(([date, name]) => ({ date, name, type: 'KR' as const })),
+        ...Object.entries(JP_HOLIDAYS_2026)
+            .filter(([date]) => date.startsWith(`${overviewYear}-${String(overviewMonth + 1).padStart(2, '0')}-`))
+            .map(([date, name]) => ({ date, name, type: 'JP' as const }))
+    ]
+        .map((holiday) => {
+            const dateObj = parseISO(holiday.date);
+            return {
+                ...holiday,
+                sortKey: Number.isNaN(dateObj.getTime()) ? holiday.date : dateObj.getTime()
+            };
+        })
+        .sort((a, b) => {
+            if (typeof a.sortKey === 'number' && typeof b.sortKey === 'number') {
+                return a.sortKey - b.sortKey;
+            }
+            return String(a.sortKey).localeCompare(String(b.sortKey));
+        });
+
+    const overviewEvents = events
+        .map((event) => {
+            try {
+                const parsed = parseISO(event.event_date);
+                if (Number.isNaN(parsed.getTime())) {
+                    return { ...event, parsedDate: null as Date | null };
+                }
+                return { ...event, parsedDate: parsed };
+            } catch {
+                const fallback = new Date(event.event_date);
+                return { ...event, parsedDate: Number.isNaN(fallback.getTime()) ? null : fallback };
+            }
+        })
+        .filter((event) => event.parsedDate && event.parsedDate >= overviewStart && event.parsedDate <= overviewEnd)
+        .sort((a, b) => (a.parsedDate?.getTime() ?? 0) - (b.parsedDate?.getTime() ?? 0));
+
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const overviewItems = [
+        ...mergedHolidays.map((holiday) => ({
+            id: `${holiday.type}-${holiday.date}`,
+            date: holiday.date,
+            name: holiday.name,
+            type: 'holiday' as const,
+            localeTag: holiday.type
+        })),
+        ...overviewEvents.map((event) => ({
+            id: event.id,
+            date: event.parsedDate ? format(event.parsedDate, 'yyyy-MM-dd') : event.event_date,
+            name: event.title,
+            type: 'event' as const,
+            timeLabel: formatTimeLabel(event.event_date)
+        }))
+    ]
+        .map((item) => {
+            const parsed = parseISO(item.date);
+            return {
+                ...item,
+                sortKey: Number.isNaN(parsed.getTime()) ? item.date : parsed.getTime()
+            };
+        })
+        .sort((a, b) => {
+            if (typeof a.sortKey === 'number' && typeof b.sortKey === 'number') {
+                return a.sortKey - b.sortKey;
+            }
+            return String(a.sortKey).localeCompare(String(b.sortKey));
+        });
+
+    const todayItems = overviewItems.filter((item) => item.date === todayKey);
+    const todayDate = startOfDay(new Date());
+    const upcomingEnd = addDays(todayDate, 7);
+    const upcomingItems = overviewItems.filter((item) => {
+        if (item.date === todayKey) return false;
+        const parsed = parseISO(item.date);
+        if (Number.isNaN(parsed.getTime())) return false;
+        return parsed > todayDate && parsed <= upcomingEnd;
+    });
+    const activeItems = overviewTab === 'today' ? todayItems : overviewItems;
+    const totalCount = overviewTab === 'today'
+        ? todayItems.length + upcomingItems.length
+        : overviewItems.length;
+    const shouldScrollOverview = totalCount > 6;
+
     // --- 스타일링 객체 (CSS-in-JS) ---
     const styles = {
         container: {
-            backgroundColor: 'var(--bg-card)',
+            background: 'linear-gradient(180deg, rgba(24,24,27,0.98) 0%, rgba(10,10,12,0.98) 100%)',
             borderRadius: '24px',
-            border: '1px solid var(--border-color)',
+            border: '1px solid rgba(255,255,255,0.06)',
             height: '100%',
             display: 'flex',
             flexDirection: 'column' as const,
             overflow: 'hidden',
             position: 'relative' as const,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+            boxShadow: '0 24px 40px rgba(0,0,0,0.45)'
         },
         header: {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: '24px',
-            borderBottom: '1px solid rgba(255,255,255,0.05)'
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            background: 'transparent'
+        },
+        bodyRow: (narrow: boolean) => ({
+            display: 'flex',
+            flexDirection: narrow ? 'column' as const : 'row' as const,
+            flex: 1,
+            minHeight: 0,
+            height: '100%',
+            alignItems: 'stretch'
+        }),
+        calendarColumn: {
+            display: 'flex',
+            flexDirection: 'column' as const,
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0
         },
         weekHeader: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            backgroundColor: 'rgba(0,0,0,0.2)',
-            borderBottom: '1px solid rgba(255,255,255,0.05)'
+            gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.15) 100%)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)'
         },
         grid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
+            gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
             flex: 1,
             backgroundColor: 'transparent'
+        },
+        sidePanel: (narrow: boolean) => ({
+            width: narrow ? '100%' : '260px',
+            minWidth: narrow ? '100%' : '260px',
+            minHeight: 0,
+            height: '100%',
+            maxHeight: '100%',
+            borderLeft: narrow ? 'none' : '1px solid rgba(255,255,255,0.06)',
+            borderTop: narrow ? '1px solid rgba(255,255,255,0.06)' : 'none',
+            background: 'linear-gradient(180deg, rgba(12,12,14,0.9) 0%, rgba(8,8,10,0.98) 100%)',
+            padding: '18px',
+            display: 'flex',
+            flexDirection: 'column' as const,
+            gap: '14px',
+            overflow: 'hidden'
+        }),
+        sideTitle: {
+            fontSize: '0.72rem',
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase' as const,
+            color: 'rgba(226,232,240,0.7)'
+        },
+        sideList: {
+            display: 'flex',
+            flexDirection: 'column' as const,
+            gap: '10px',
+            overflowY: 'auto' as const,
+            minHeight: 0,
+            flex: 1,
+            paddingRight: '8px',
+            paddingLeft: '2px',
+            paddingTop: '2px',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(129,140,248,0.55) transparent'
+        },
+        sideItem: {
+            display: 'flex',
+            flexDirection: 'column' as const,
+            gap: '4px',
+            padding: '6px 2px 10px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)'
+        },
+        sideItemLabel: {
+            fontSize: '0.78rem',
+            fontWeight: 600,
+            color: '#f4f4f5'
+        },
+        sideItemLabelToday: {
+            color: '#34d399'
+        },
+        sideItemLabelPast: {
+            color: '#71717a',
+            textDecoration: 'line-through'
+        },
+        overviewTabs: {
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '8px'
+        },
+        overviewLegend: {
+            display: 'flex',
+            flexWrap: 'wrap' as const,
+            gap: '8px',
+            marginTop: '-13px'
+        },
+        overviewLegendItem: (color: string) => ({
+            fontSize: '0.62rem',
+            fontWeight: 600,
+            color,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+        }),
+        overviewLegendDot: (color: string) => ({
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            backgroundColor: color
+        }),
+        overviewTab: (active: boolean) => ({
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase' as const,
+            padding: '6px 10px',
+            borderRadius: '999px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: active ? '#f8fafc' : 'rgba(255,255,255,0.55)',
+            backgroundColor: active ? 'rgba(129,140,248,0.2)' : 'transparent',
+            cursor: 'pointer'
+        }),
+        overviewSeparator: {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.65rem',
+            letterSpacing: '0.12em',
+            color: 'rgba(148,163,184,0.7)',
+            margin: '6px 0 2px'
+        },
+        overviewSeparatorLine: {
+            flex: 1,
+            height: '1px',
+            backgroundColor: 'rgba(255,255,255,0.06)'
+        },
+        overviewSeparatorText: {
+            padding: '0 8px',
+            fontSize: '0.65rem',
+            letterSpacing: '0.12em',
+            color: 'rgba(148,163,184,0.7)'
+        },
+        sideItemMetaPast: {
+            color: '#71717a'
+        },
+        sideItemMeta: {
+            fontSize: '0.65rem',
+            color: '#a1a1aa',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
         },
         dayCell: (isOtherMonth: boolean) => ({
             padding: '8px',
             minHeight: '80px',
             display: 'flex',
             flexDirection: 'column' as const,
+            minWidth: 0,
             borderRight: '1px solid rgba(255,255,255,0.03)',
             borderBottom: '1px solid rgba(255,255,255,0.03)',
             cursor: 'pointer',
-            backgroundColor: isOtherMonth ? 'rgba(0,0,0,0.1)' : 'transparent',
-            transition: 'background-color 0.2s',
+            backgroundColor: isOtherMonth ? 'rgba(0,0,0,0.18)' : 'transparent',
+            transition: 'background-color 0.2s, box-shadow 0.2s, transform 0.2s',
             position: 'relative' as const
         }),
+        daySelected: {
+            backgroundColor: 'rgba(129,140,248,0.18)',
+            boxShadow: 'inset 0 0 0 1px rgba(129,140,248,0.45)'
+        },
+        dayToday: {
+            boxShadow: 'inset 0 0 0 1px rgba(52,211,153,0.45)'
+        },
         eventChip: {
-            fontSize: '0.6rem', 
+            fontSize: '0.6rem',
             color: '#e4e4e7', 
-            backgroundColor: 'rgba(129, 140, 248, 0.15)', 
-            padding: '2px 4px', 
+            backgroundColor: 'rgba(129, 140, 248, 0.18)', 
+            padding: '3px 5px', 
             borderRadius: '4px',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             gap: '6px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            maxWidth: '100%',
+            lineHeight: 1.1,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.25)'
         },
         eventTime: {
             marginRight: '6px',
             fontSize: '0.65rem',
             opacity: 0.95,
             flexShrink: 0,
-            fontVariantNumeric: 'tabular-nums'
+            fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1.1,
+            marginTop: '1px'
         },
         eventTitle: {
             minWidth: 0,
@@ -428,7 +696,33 @@ const CalendarWidget: React.FC = () => {
             left: '-4px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap' as const
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            whiteSpace: 'normal' as const,
+            lineHeight: '1.2'
+        },
+        eventList: {
+            marginTop: 'auto',
+            display: 'flex',
+            flexDirection: 'column' as const,
+            gap: '4px',
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto' as const,
+            paddingRight: '2px',
+            paddingBottom: '6px',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(129,140,248,0.55) transparent'
+        },
+        eventListFade: {
+            position: 'absolute' as const,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: '18px',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(10,10,12,0.9) 100%)',
+            pointerEvents: 'none'
         }
     };
 
@@ -473,101 +767,273 @@ const CalendarWidget: React.FC = () => {
                 </div>
             </div>
 
-            {/* Week Header */}
-            <div style={styles.weekHeader}>
-                {weekDays.map((d, i) => (
-                    <div key={d} style={{ textAlign: 'center', padding: '10px 0', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em', color: i === 0 ? '#ef4444' : i === 6 ? '#3b82f6' : '#a1a1aa' }}>
-                        {d}
+            <div style={styles.bodyRow(isNarrow)}>
+                <div style={styles.calendarColumn}>
+                    {/* Week Header */}
+                    <div style={styles.weekHeader}>
+                        {weekDays.map((d, i) => (
+                            <div key={d} style={{ textAlign: 'center', padding: '10px 0', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.16em', color: i === 0 ? '#ef4444' : i === 6 ? '#3b82f6' : '#a1a1aa' }}>
+                                {d}
+                            </div>
+                        ))}
                     </div>
-                ))}
-            </div>
 
-            {/* Calendar Grid */}
-            <div style={styles.grid}>
-                {calendarDays.map((day) => {
-                    const dateStr = format(day, 'yyyy-MM-dd');
-                    const holiday = HOLIDAYS_2026[dateStr];
-                    const jpHoliday = JP_HOLIDAYS_2026[dateStr];
-                    const dayEvents = events.filter(e => {
-                        try {
-                            return format(parseISO(e.event_date), 'yyyy-MM-dd') === dateStr;
-                        } catch {
-                            return e.event_date === dateStr;
-                        }
-                    });
-                    const isOtherMonth = !isSameMonth(day, monthStart);
-                    const isTodayNow = isToday(day);
-                    const Sunday = day.getDay() === 0;
-                    const Saturday = day.getDay() === 6;
+                    {/* Calendar Grid */}
+                    <div style={styles.grid}>
+                        {calendarDays.map((day) => {
+                            const dateStr = format(day, 'yyyy-MM-dd');
+                            const holiday = HOLIDAYS_2026[dateStr];
+                            const jpHoliday = JP_HOLIDAYS_2026[dateStr];
+                            const dayEvents = events
+                                .filter(e => {
+                                try {
+                                    return format(parseISO(e.event_date), 'yyyy-MM-dd') === dateStr;
+                                } catch {
+                                    return e.event_date === dateStr;
+                                }
+                            })
+                                .sort((a, b) => {
+                                    const aDate = new Date(a.event_date);
+                                    const bDate = new Date(b.event_date);
+                                    return aDate.getTime() - bDate.getTime();
+                                });
+                            const isOtherMonth = !isSameMonth(day, monthStart);
+                            const isTodayNow = isToday(day);
+                            const isSelected = selectedDate ? format(selectedDate, 'yyyy-MM-dd') === dateStr : false;
+                            const Sunday = day.getDay() === 0;
+                            const Saturday = day.getDay() === 6;
 
-                    return (
-                        <div
-                            key={day.toString()}
-                            onClick={() => handleDateClick(day)}
-                            style={styles.dayCell(isOtherMonth)}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isOtherMonth ? 'rgba(0,0,0,0.1)' : 'transparent')}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <span style={{ 
-                                    width: '24px', 
-                                    height: '24px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    borderRadius: '50%',
-                                    fontSize: '0.8rem',
-                                    backgroundColor: isTodayNow ? '#818cf8' : 'transparent',
-                                    color: isTodayNow ? '#fff' : (holiday || Sunday ? '#ef4444' : jpHoliday ? '#f472b6' : Saturday ? '#3b82f6' : isOtherMonth ? '#3f3f46' : '#f4f4f5'),
-                                    fontWeight: isTodayNow ? 700 : 500
-                                }}>
-                                    {format(day, 'd')}
-                                </span>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                                    {holiday && (
-                                        <span style={{ fontSize: '0.6rem', color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
-                                            {holiday}
+                            return (
+                                <div
+                                    key={day.toString()}
+                                    onClick={() => handleDateClick(day)}
+                                    style={{
+                                        ...styles.dayCell(isOtherMonth),
+                                        ...(isTodayNow ? styles.dayToday : {}),
+                                        ...(isSelected ? styles.daySelected : {})
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)';
+                                        e.currentTarget.style.boxShadow = 'inset 0 0 0 1px rgba(129,140,248,0.15)';
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = isOtherMonth ? 'rgba(0,0,0,0.18)' : 'transparent';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <span style={{ 
+                                            width: '24px', 
+                                            height: '24px', 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center', 
+                                            borderRadius: '50%',
+                                            fontSize: '0.8rem',
+                                            backgroundColor: isTodayNow ? '#818cf8' : 'transparent',
+                                            color: isTodayNow ? '#fff' : (holiday || Sunday ? '#ef4444' : jpHoliday ? '#f472b6' : Saturday ? '#3b82f6' : isOtherMonth ? '#3f3f46' : '#f4f4f5'),
+                                            fontWeight: isTodayNow ? 700 : 500
+                                        }}>
+                                            {format(day, 'd')}
                                         </span>
-                                    )}
-                                    {jpHoliday && (
-                                        <span style={{ fontSize: '0.55rem', color: '#f472b6', backgroundColor: 'rgba(244, 114, 182, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
-                                            {jpHoliday}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                            
-                            {/* 일정 목록 */}
-                            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                {dayEvents.slice(0, 2).map(e => {
-                                    const timeLabel = formatTimeLabel(e.event_date);
-
-                                    return (
-                                        <div 
-                                            key={e.id} 
-                                            style={{ 
-                                                ...styles.eventChip,
-                                                borderTop: '1px solid transparent',
-                                                borderRight: '1px solid transparent',
-                                                borderBottom: '1px solid transparent',
-                                                borderLeft: `2px solid ${e.color || '#818cf8'}`
-                                            }}
-                                            title={e.title}
-                                        >
-                                            <span style={styles.eventTime}>{timeLabel}</span>
-                                            <span style={styles.eventTitle}>{e.title}</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                            {holiday && (
+                                                <span style={{ fontSize: '0.6rem', color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
+                                                    {holiday}
+                                                </span>
+                                            )}
+                                            {jpHoliday && (
+                                                <span style={{ fontSize: '0.55rem', color: '#f472b6', backgroundColor: 'rgba(244, 114, 182, 0.1)', padding: '2px 4px', borderRadius: '4px' }}>
+                                                    {jpHoliday}
+                                                </span>
+                                            )}
                                         </div>
-                                    );
-                                })} 
-                                {dayEvents.length > 2 && (
-                                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', paddingLeft: '2px' }}>
-                                        + {dayEvents.length - 2}개 더
                                     </div>
-                                )}
+                                    
+                                    {/* 일정 목록 */}
+                                    <div style={{ position: 'relative', marginTop: 'auto' }}>
+                                        <div style={styles.eventList}>
+                                            {dayEvents.map(e => {
+                                                const timeLabel = formatTimeLabel(e.event_date);
+                                                const accent = getEventAccent(e);
+
+                                                return (
+                                                    <div 
+                                                        key={e.id} 
+                                                        style={{ 
+                                                            ...styles.eventChip,
+                                                            borderTop: '1px solid transparent',
+                                                            borderRight: '1px solid transparent',
+                                                            borderBottom: '1px solid transparent',
+                                                            borderLeft: `2px solid ${accent}`,
+                                                            background: `linear-gradient(90deg, ${accent}26 0%, rgba(0,0,0,0) 65%)`
+                                                        }}
+                                                        title={e.title}
+                                                    >
+                                                        <span style={styles.eventTime}>{timeLabel}</span>
+                                                        <span style={styles.eventTitle}>{e.title}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        {dayEvents.length > 3 && <div style={styles.eventListFade} />}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <aside style={styles.sidePanel(isNarrow)}>
+                    <div style={styles.overviewTabs}>
+                        <button
+                            type="button"
+                            onClick={() => setOverviewTab('today')}
+                            style={styles.overviewTab(overviewTab === 'today')}
+                        >
+                            오늘 일정
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setOverviewTab('all')}
+                            style={styles.overviewTab(overviewTab === 'all')}
+                        >
+                            전체 일정
+                        </button>
+                    </div>
+                    <div style={styles.overviewLegend}>
+                        <span style={styles.overviewLegendItem('#34d399')}>
+                            <span style={styles.overviewLegendDot('#34d399')} />
+                            오늘 일정
+                        </span>
+                        <span style={styles.overviewLegendItem('#f8fafc')}>
+                            <span style={styles.overviewLegendDot('#f8fafc')} />
+                            남은 일정
+                        </span>
+                        <span style={styles.overviewLegendItem('#ef4444')}>
+                            <span style={styles.overviewLegendDot('#ef4444')} />
+                            공휴일
+                        </span>
+                        <span style={styles.overviewLegendItem('#71717a')}>
+                            <span style={styles.overviewLegendDot('#71717a')} />
+                            지난 일정
+                        </span>
+                    </div>
+                    <div
+                        style={{
+                            ...styles.sideList,
+                            overflowY: shouldScrollOverview ? 'auto' : 'hidden',
+                            maxHeight: '100%'
+                        }}
+                    >
+                        {overviewTab === 'today' && todayItems.length === 0 && upcomingItems.length === 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#52525b', paddingTop: '6px' }}>
+                                오늘 일정이 없습니다.
                             </div>
-                        </div>
-                    );
-                })}
+                        )}
+                        {overviewTab === 'all' && overviewItems.length === 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#52525b', paddingTop: '6px' }}>
+                                {overviewMonthLabel} 일정이 없습니다.
+                            </div>
+                        )}
+                        {overviewTab === 'today' && todayItems.length === 0 && upcomingItems.length > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#52525b', paddingTop: '6px' }}>
+                                오늘 일정이 없습니다.
+                            </div>
+                        )}
+                        {overviewTab === 'today' && todayItems.length > 0 && (
+                            <div style={{ ...styles.overviewSeparator, marginBottom: '6px' }}>
+                                <span style={styles.overviewSeparatorLine} />
+                                <span style={styles.overviewSeparatorText}>오늘 일정</span>
+                                <span style={styles.overviewSeparatorLine} />
+                            </div>
+                        )}
+                        {(overviewTab === 'today' ? todayItems : activeItems).map((item, index, list) => {
+                            const labelDate = parseISO(item.date);
+                            const dateLabel = Number.isNaN(labelDate.getTime())
+                                ? item.date
+                                : format(labelDate, 'M/d (EEE)', { locale: ko });
+                            const isLast = index === list.length - 1 && (overviewTab !== 'today' || upcomingItems.length === 0);
+                            const isTodaySectionEnd = overviewTab === 'today' && upcomingItems.length > 0 && index === list.length - 1;
+                            const isTodayItem = item.date === todayKey;
+                            const isPastItem = item.date < todayKey;
+                            return (
+                                <div
+                                    key={item.id}
+                                    style={{
+                                        ...styles.sideItem,
+                                        borderBottom: isLast || isTodaySectionEnd ? 'none' : styles.sideItem.borderBottom
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            ...styles.sideItemLabel,
+                                            ...(isTodayItem ? styles.sideItemLabelToday : {}),
+                                            ...(isPastItem ? styles.sideItemLabelPast : {})
+                                        }}
+                                    >
+                                        {item.name}
+                                    </div>
+                                    <div style={{ ...styles.sideItemMeta, ...(isPastItem ? styles.sideItemMetaPast : {}) }}>
+                                        <span>{dateLabel}</span>
+                                        {item.type === 'holiday' ? (
+                                            <span style={{ color: item.localeTag === 'KR' ? '#ef4444' : '#f472b6' }}>
+                                                {item.localeTag} 공휴일
+                                            </span>
+                                        ) : (
+                                            item.timeLabel && <span>{item.timeLabel}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {overviewTab === 'today' && upcomingItems.length > 0 && (
+                            <div style={{ ...styles.overviewSeparator, marginTop: '8px', marginBottom: '6px' }}>
+                                <span style={styles.overviewSeparatorLine} />
+                                <span style={styles.overviewSeparatorText}>다가오는 일정</span>
+                                <span style={styles.overviewSeparatorLine} />
+                            </div>
+                        )}
+                        {overviewTab === 'today' && upcomingItems.map((item, index) => {
+                            const labelDate = parseISO(item.date);
+                            const dateLabel = Number.isNaN(labelDate.getTime())
+                                ? item.date
+                                : format(labelDate, 'M/d (EEE)', { locale: ko });
+                            const isLast = index === upcomingItems.length - 1;
+                            const isPastItem = item.date < todayKey;
+                            return (
+                                <div
+                                    key={item.id}
+                                    style={{
+                                        ...styles.sideItem,
+                                        borderBottom: isLast ? 'none' : styles.sideItem.borderBottom
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            ...styles.sideItemLabel,
+                                            ...(isPastItem ? styles.sideItemLabelPast : {})
+                                        }}
+                                    >
+                                        {item.name}
+                                    </div>
+                                    <div style={{ ...styles.sideItemMeta, ...(isPastItem ? styles.sideItemMetaPast : {}) }}>
+                                        <span>{dateLabel}</span>
+                                        {item.type === 'holiday' ? (
+                                            <span style={{ color: item.localeTag === 'KR' ? '#ef4444' : '#f472b6' }}>
+                                                {item.localeTag} 공휴일
+                                            </span>
+                                        ) : (
+                                            item.timeLabel && <span>{item.timeLabel}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </aside>
             </div>
 
             {/* Error Overlay (Floating) */}
@@ -670,7 +1136,9 @@ const CalendarWidget: React.FC = () => {
                                         style={{ flex: 1, minWidth: 0, height: '40px', boxSizing: 'border-box', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '8px 12px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
                                         onKeyPress={e => e.key === 'Enter' && addEvent()}
                                     />
-                                    <button onClick={addEvent} style={{ backgroundColor: '#818cf8', border: 'none', borderRadius: '10px', width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}><Plus size={18} /></button>
+                                    <button onClick={addEvent} style={{ backgroundColor: '#818cf8', border: 'none', borderRadius: '10px', width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+                                        <Plus size={18} />
+                                    </button>
                                 </div>
                             </div>
                         </motion.div>

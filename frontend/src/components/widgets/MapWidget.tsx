@@ -1,11 +1,21 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
 // Leaflet 아이콘 문제 해결을 위한 지연 설정
+const MapUpdater: React.FC<{ center: [number, number] }> = ({ center }) => {
+    const map = useMap();
+
+    useEffect(() => {
+        map.setView(center);
+    }, [map, center]);
+
+    return null;
+};
+
 const MapWidgetContent: React.FC = () => {
     const [isMounted, setIsMounted] = useState(false);
     const [position, setPosition] = useState<[number, number]>([37.5665, 126.9780]);
@@ -112,12 +122,12 @@ const MapWidgetContent: React.FC = () => {
 
             <div className="flex-1 w-full h-full">
                 <MapContainer
-                    key={`${position[0]}-${position[1]}`}
                     center={position}
                     zoom={13}
                     style={{ height: '100%', width: '100%' }}
                     zoomControl={false}
                 >
+                    <MapUpdater center={position} />
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
